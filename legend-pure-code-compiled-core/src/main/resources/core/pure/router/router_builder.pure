@@ -58,7 +58,9 @@ function meta::pure::router::builder::build(v:ValueSpecification[1], l:List<Perm
     $v->match([
                f:FunctionExpression[1]| if($f->isSerialize($extensions),
                                                  | // Not routing tree part in serialize function call
-                                                   if ($f.parametersValues->size() > 2 , | ^$f(parametersValues = [$f.parametersValues->evaluateAndDeactivate()->at(0)->build($l, $last, $mapping, $exeCtx, $extensions, $debug), $f.parametersValues->evaluateAndDeactivate()->at(1), $f.parametersValues->evaluateAndDeactivate()->at(2)]), | ^$f(parametersValues = [$f.parametersValues->evaluateAndDeactivate()->at(0)->build($l, $last, $mapping, $exeCtx, $extensions, $debug), $f.parametersValues->evaluateAndDeactivate()->at(1)])),
+                                                   if ($f.parametersValues->size() > 2 , 
+                                                       | ^$f(parametersValues = [$f.parametersValues->evaluateAndDeactivate()->at(0)->build($l, $last, $mapping, $exeCtx, $extensions, $debug), $f.parametersValues->evaluateAndDeactivate()->at(1), $f.parametersValues->evaluateAndDeactivate()->at(2)]), 
+                                                       | ^$f(parametersValues = [$f.parametersValues->evaluateAndDeactivate()->at(0)->build($l, $last, $mapping, $exeCtx, $extensions, $debug), $f.parametersValues->evaluateAndDeactivate()->at(1)])),
                                                  | let params = $f.parametersValues->evaluateAndDeactivate()->map(v|$v->build($l, $last, $mapping, $exeCtx, $extensions, $debug));
 
                                                    $f.func->match([q:QualifiedProperty<Any>[1] | let sequence = $q.expressionSequence->evaluateAndDeactivate()->map(ex|$ex->build($l, $last, $mapping, $exeCtx, $extensions, $debug));
@@ -166,10 +168,18 @@ function meta::pure::router::builder::build(v:ValueSpecification[1], l:List<Perm
                                                                                value = ^$f(parametersValues=$newParams),
                                                                                propertyMapping = $propertyMappings->removeDuplicates({a,b|$a.property == $b.property && $a.sourceSetImplementationId == $b.sourceSetImplementationId && $a.targetSetImplementationId == $b.targetSetImplementationId})
                                                                              );
-                                                                          ,| ^$r(
-                                                                                sets = $s,
-                                                                                value = ^$f(parametersValues=$newParams)
-                                                                             )
+                                                                          ,|
+                                                                             let routedFunction = if ($f.func->instanceOf(QualifiedProperty),
+                                                                                                      | let qp = $f.func->cast(@QualifiedProperty<Any>)->evaluateAndDeactivate();
+                                                                                                        let routedExprSeq = $qp.expressionSequence->map(es | $es->build($l, $r.sets->first(), $e.mapping, $exeCtx, $extensions, $debug));
+                                                                                                        ^$f(func = ^$qp(expressionSequence = $routedExprSeq));,
+                                                                                                      | $f
+                                                                                                  );
+
+                                                                             ^$r(
+                                                                               sets = $s,
+                                                                               value = ^$routedFunction(parametersValues = $newParams)
+                                                                             );
                                                                           )
                                                                     );,
                                                                  z:Void[1]|$z,
